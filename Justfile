@@ -1,5 +1,5 @@
-repo_organization := "centos-workstation"
-image_name := "main"
+export repo_organization := "centos-workstation"
+export image_name := "main"
 
 [private]
 default:
@@ -62,11 +62,8 @@ sudoif command *args:
     }
     sudoif {{ command }} {{ args }}
 
-build centos_version="stream10" tag="latest":
+build $centos_version="stream10" $tag="latest":
     #!/usr/bin/env bash
-    tag={{ tag }}
-    image_name={{ image_name }}
-    centos_version={{ centos_version }}
 
     # Get Version
     if [[ "${tag}" =~ stable ]]; then
@@ -78,7 +75,7 @@ build centos_version="stream10" tag="latest":
     BUILD_ARGS=()
     BUILD_ARGS+=("--build-arg" "MAJOR_VERSION=${centos_version}")
     # BUILD_ARGS+=("--build-arg" "IMAGE_NAME=${image_name}")
-    # BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR={{ repo_organization }}")
+    # BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${repo_organization}")
     if [[ -z "$(git status -s)" ]]; then
         BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
     fi
@@ -97,21 +94,28 @@ build centos_version="stream10" tag="latest":
         --tag "${image_name}:${tag}" \
         .
 
-build-vm image type="qcow2":
+build-vm $target_image=("localhost/" + image_name) $tag="latest" $type="qcow2":
     #!/usr/bin/env bash
     set -euo pipefail
-    TARGET_IMAGE={{ image }}
 
-    if ! sudo podman image exists $TARGET_IMAGE ; then
+    if ! sudo podman image exists "${target_image}" ; then
       echo "Ensuring image is on root storage"
       COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
-      sudo podman image scp $USER@localhost::$TARGET_IMAGE root@localhost:: 
+      sudo podman image scp "$USER@localhost::${target_image}" root@localhost::
       rm -rf "${COPYTMP}"
     fi
 
     echo "Cleaning up previous build"
     sudo rm -rf output || true
     mkdir -p output
+
+    args="--type ${type}"
+
+    if [[ $target_image == localhost/* ]]; then
+      args+=" --local"
+    fi
+
+    echo "${args}"
     sudo podman run \
       --rm \
       -it \
@@ -122,13 +126,12 @@ build-vm image type="qcow2":
       -v $(pwd)/output:/output \
       -v /var/lib/containers/storage:/var/lib/containers/storage \
       quay.io/centos-bootc/bootc-image-builder:latest \
-      --type {{ type }} \
-      --local \
-      $TARGET_IMAGE
+      ${args} \
+      "${target_image}"
 
-    sudo chown -R $USER:$USER output
-    echo "making the image biggerer"
-    sudo qemu-img resize output/qcow2/disk.qcow2 80G
+      sudo chown -R $USER:$USER output
+      echo "making the image biggerer"
+      sudo qemu-img resize output/qcow2/disk.qcow2 80G
 
 run-vm:
     virsh dominfo centos-workstation-main &> /dev/null && \
