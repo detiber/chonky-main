@@ -75,9 +75,9 @@ build $target_image=image_name $tag=default_tag:
     BUILD_ARGS+=("--build-arg" "MAJOR_VERSION=${centos_version}")
     # BUILD_ARGS+=("--build-arg" "IMAGE_NAME=${image_name}")
     # BUILD_ARGS+=("--build-arg" "IMAGE_VENDOR=${repo_organization}")
-    if [[ -z "$(git status -s)" ]]; then
-        BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
-    fi
+    # if [[ -z "$(git status -s)" ]]; then
+    #     BUILD_ARGS+=("--build-arg" "SHA_HEAD_SHORT=$(git rev-parse --short HEAD)")
+    # fi
 
     LABELS=()
     LABELS+=("--label" "org.opencontainers.image.title=${image_name}")
