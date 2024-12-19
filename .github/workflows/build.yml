@@ -19,6 +19,8 @@ env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "latest"
   CENTOS_VERSION: "stream10"
+  LOGO_URL: "https://avatars.githubusercontent.com/u/120078124?s=200&v=4"
+  README_URL: "https://raw.githubusercontent.com/${{ github.repository }}/main/README.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
@@ -94,6 +96,36 @@ jobs:
 
           echo "alias_tags=${alias_tags[*]}" >> $GITHUB_OUTPUT
 
+      - name: Build Image
+        id: build-image
+        shell: bash
+        run: |
+          just build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+
+      # Reprocess raw-img using rechunker which will delete it
+      - name: Run Rechunker
+        id: rechunk
+        uses: hhd-dev/rechunk@v0.8.1
+        with:
+          rechunk: 'ghcr.io/hhd-dev/rechunk:v1.0.1'
+          ref: "${IMAGE_NAME}:${DEFAULT_TAG}"
+          prev-ref: "${{ env.IMAGE_REGISTRY }}/${IMAGE_NAME}:${DEFAULT_TAG}"
+          skip_compression: true
+          version: ${{ env.CENTOS_VERSION }}
+          labels: |
+            org.opencontainers.image.title=${{ env.IMAGE_NAME }}
+            org.opencontainers.image.description=${{ env.IMAGE_DESC }}
+            io.artifacthub.package.readme-url=${{ env.README_URL }}
+            io.artifacthub.package.logo-url=${{ env.LOGO_URL }}
+
+      - name: Load in podman and tag
+        run: |
+          IMAGE=$(podman pull ${{ steps.rechunk.outputs.ref }})
+          sudo rm -rf ${{ steps.rechunk.outputs.output }}
+          for tag in ${{ steps.generate-tags.outputs.alias_tags }}; do
+            podman tag $IMAGE ${{ env.IMAGE_NAME }}:$tag
+          done
+
       # Workaround bug where capital letters in your GitHub username make it impossible to push to GHCR.
       # https://github.com/macbre/push-to-ghcr/issues/12
       - name: Lowercase Registry
@@ -102,13 +134,6 @@ jobs:
         with:
           string: ${{ env.IMAGE_REGISTRY }}
 
-      - name: Build Image
-        id: build-image
-        shell: bash
-        run: |
-          IMAGE_FULL="${{ steps.registry_case.outputs.lowercase }}/${IMAGE_NAME}"
-          just build "${IMAGE_FULL}" "${DEFAULT_TAG}"
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -116,24 +141,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push to GHCR
-        id: push
+      # Push the image to GHCR (Image Registry)
+      - name: Push To GHCR
+        uses: redhat-actions/push-to-registry@v2
         if: github.event_name != 'pull_request'
-        uses: Wandalen/wretry.action@ffdd254f4eaf1562b8a2c66aeaa37f1ff2231179 # v3.7.3
+        id: push
         with:
-          attempt_limit: 3
-          attempt_delay: 15000
-          command: |
-            set -euox pipefail
-
-            IMAGE_FULL="${{ steps.registry_case.outputs.lowercase }}/${IMAGE_NAME}"
-            for tag in ${{ steps.generate-tags.outputs.alias_tags }}; do
-              podman push "${IMAGE_FULL}:${DEFAULT_TAG}" "${IMAGE_FULL}:${tag}"
-            done
-
-            digest=$(skopeo inspect "docker://${IMAGE_FULL}:${DEFAULT_TAG}" --format '{{.Digest}}')
-
-            echo "digest=${digest}" >> $GITHUB_OUTPUT
+          registry: ${{ steps.registry_case.outputs.lowercase }}
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ steps.generate-tags.outputs.alias_tags }}
+          extra-args: |
+            --disable-content-trust
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.7.0
@@ -145,6 +163,6 @@ jobs:
           IMAGE_FULL="${{ steps.registry_case.outputs.lowercase }}/${IMAGE_NAME}"
           cosign sign -y --key env://COSIGN_PRIVATE_KEY ${IMAGE_FULL}@${TAGS}
         env:
-          TAGS: ${{ steps.push.outputs.outputs && fromJSON(steps.push.outputs.outputs).digest }}
+          TAGS: ${{ steps.push.outputs.digest }}
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
