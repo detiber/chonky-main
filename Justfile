@@ -93,16 +93,32 @@ build $target_image=image_name $tag=default_tag:
         --tag "${target_image}:${tag}" \
         .
 
-_build-bib $target_image $tag $type $config:
+_rootful_load_image $target_image=("localhost/" + image_name) $tag="latest":
+    #!/usr/bin/bash
+    set -eoux pipefail
+
+    if [[ $target_image == localhost/* ]]; then
+        # Check if image is already built
+        ID=$(podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
+        if [[ -z "$ID" ]]; then
+            just build "${target_image}" "${tag}"
+        fi
+
+        # Load into Rootful Podman
+        ID=$(just sudoif podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
+        if [[ -z "$ID" ]]; then
+            COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
+            just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::"${target_image}:${tag}" root@localhost::"${target_image}:${tag}"
+            rm -rf "${COPYTMP}"
+        fi
+    else
+        # Make sure the image is present and/or up to date
+        just sudoif podman pull "${target_image}:${tag}"
+    fi
+
+_build-bib $target_image $tag $type $config: (_rootful_load_image target_image tag)
     #!/usr/bin/env bash
     set -euo pipefail
-
-    if ! sudo podman image exists "${target_image}" ; then
-      echo "Ensuring image is on root storage"
-      COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
-      sudo podman image scp "$USER@localhost::${target_image}" root@localhost::
-      rm -rf "${COPYTMP}"
-    fi
 
     echo "Cleaning up previous build"
     sudo rm -rf "output/${type}" || true
@@ -208,28 +224,9 @@ run-iso $target_image=("localhost/" + image_name) $tag=default_tag:
 
 export rechunk_dir := "_build_rechunk"
 
-rechunk $target_image=("localhost/" + image_name) $centos_version="stream10" $tag="latest":
+rechunk $target_image=("localhost/" + image_name) $centos_version="stream10" $tag="latest": (_rootful_load_image target_image tag)
     #!/usr/bin/bash
     set -eoux pipefail
-
-    if [[ $target_image == localhost/* ]]; then
-        # Check if image is already built
-        ID=$(podman images --filter reference=localhost/"${image_name}":"${tag}" --format "'{{ '{{.ID}}' }}'")
-        if [[ -z "$ID" ]]; then
-            just build "${centos_version}" "${tag}"
-        fi
-
-        # Load into Rootful Podman
-        ID=$(just sudoif podman images --filter reference=localhost/"${image_name}":"${tag}" --format "'{{ '{{.ID}}' }}'")
-        if [[ -z "$ID" ]]; then
-            COPYTMP=$(mktemp -p "${PWD}" -d -t _build_podman_scp.XXXXXXXXXX)
-            just sudoif TMPDIR=${COPYTMP} podman image scp ${UID}@localhost::localhost/"${image_name}":"${tag}" root@localhost::localhost/"${image_name}":"${tag}"
-            rm -rf "${COPYTMP}"
-        fi
-    else
-        # Make sure the image is present and/or up to date
-        just sudoif podman pull "${target_image}:${tag}"
-    fi
 
     # Prep Container
     CREF=$(just sudoif podman create "${target_image}":"${tag}" bash)

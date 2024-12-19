@@ -102,6 +102,12 @@ jobs:
         run: |
           just build "${IMAGE_NAME}" "${DEFAULT_TAG}"
 
+      - name: Load image (rootful)
+        id: load-image
+        shell: bash
+        run:
+          just _rootful_load_image "${IMAGE_NAME}" "${DEFAULT_TAG}"
+
       # Reprocess raw-img using rechunker which will delete it
       - name: Run Rechunker
         id: rechunk
