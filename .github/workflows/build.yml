@@ -47,7 +47,6 @@ jobs:
       - name: Check Just Syntax
         shell: bash
         run: |
-          which just
           just check
 
       - name: Maximize build space
@@ -101,7 +100,8 @@ jobs:
         id: build-image
         shell: bash
         run: |
-          just build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+          just=$(which just)
+          sudo $just build "${IMAGE_NAME}" "${DEFAULT_TAG}"
 
       # Reprocess raw-img using rechunker which will delete it
       - name: Run Rechunker
