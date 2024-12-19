@@ -108,8 +108,8 @@ jobs:
         uses: hhd-dev/rechunk@v0.8.1
         with:
           rechunk: 'ghcr.io/hhd-dev/rechunk:v1.0.1'
-          ref: "localhost/${IMAGE_NAME}:${DEFAULT_TAG}"
-          prev-ref: "${{ env.IMAGE_REGISTRY }}/${IMAGE_NAME}:${DEFAULT_TAG}"
+          ref: "${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
+          prev-ref: "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.DEFAULT_TAG }}"
           skip_compression: true
           version: ${{ env.CENTOS_VERSION }}
           labels: |
