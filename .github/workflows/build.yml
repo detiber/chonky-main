@@ -100,7 +100,7 @@ jobs:
         id: build-image
         shell: bash
         run: |
-          sudo just build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+          just sudoif build "${IMAGE_NAME}" "${DEFAULT_TAG}"
 
       # Reprocess raw-img using rechunker which will delete it
       - name: Run Rechunker
