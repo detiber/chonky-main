@@ -47,7 +47,7 @@ jobs:
       - name: Check Just Syntax
         shell: bash
         run: |
-          /usr/bin/env just
+          which just
           just check
 
       - name: Maximize build space
