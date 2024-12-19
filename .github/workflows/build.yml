@@ -47,6 +47,7 @@ jobs:
       - name: Check Just Syntax
         shell: bash
         run: |
+          /usr/bin/env just
           just check
 
       - name: Maximize build space
@@ -100,7 +101,7 @@ jobs:
         id: build-image
         shell: bash
         run: |
-          just sudoif build "${IMAGE_NAME}" "${DEFAULT_TAG}"
+          just build "${IMAGE_NAME}" "${DEFAULT_TAG}"
 
       # Reprocess raw-img using rechunker which will delete it
       - name: Run Rechunker
