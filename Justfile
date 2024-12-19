@@ -93,17 +93,21 @@ build $target_image=image_name $tag=default_tag:
         --tag "${target_image}:${tag}" \
         .
 
-_rootful_load_image $target_image=("localhost/" + image_name) $tag="latest":
+_rootful_load_image $target_image=image_name $tag=default_tag:
     #!/usr/bin/bash
     set -eoux pipefail
 
-    if [[ $target_image == localhost/* ]]; then
-        # Check if image is already built
-        ID=$(podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
-        if [[ -z "$ID" ]]; then
-            just build "${target_image}" "${tag}"
-        fi
+    if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
+        echo "Already root or running under sudo, no need to load image from user podman."
+        exit 0
+    fi
 
+    set +e
+    resolved_tag=$(podman inspect -t image "${target_image}:${tag}" | jq -r '.[].RepoTags.[0]')
+    return_code=$?
+    set -e
+
+    if [[ $return_code -eq 0 ]]; then
         # Load into Rootful Podman
         ID=$(just sudoif podman images --filter reference="${target_image}:${tag}" --format "'{{ '{{.ID}}' }}'")
         if [[ -z "$ID" ]]; then
