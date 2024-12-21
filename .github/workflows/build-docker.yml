@@ -3,12 +3,12 @@ name: build-centos-image-docker
 on:
   pull_request:
     branches:
-      - dockah-not-buildah
+      - main
   schedule:
     - cron: '05 10 * * *'  # 10:05am UTC everyday
   push:
     branches:
-      - dockah-not-buildah
+      - main
     paths-ignore:
       - '**/README.md'
   workflow_dispatch:
