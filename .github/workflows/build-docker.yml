@@ -127,7 +127,6 @@ jobs:
             type=raw,value=${{ env.CENTOS_VERSION }}.{{date 'YYYYMMDDD'}},enable=${{ github.ref == 'refs/heads/dockah-not-buildah' }}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
-            type=schedule,pattern={{date 'YYYYMMDD'}}
           labels: |
             io.artifacthub.package.readme-url=${{ env.README_URL }}
             org.opencontainers.image.description=${{ env.IMAGE_DESC }}
