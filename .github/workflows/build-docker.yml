@@ -114,9 +114,14 @@ jobs:
         with:
           images: |
             ${{ env.IMAGE_NAME }}
+          # tags: |
+          #   type=raw,value=latest,enable={{is_default_branch}}
+          #   type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+          #   type=sha,enable=${{ github.event_name == 'pull_request' }}
+          #   type=ref,event=pr
+          #   type=schedule,pattern={{date 'YYYYMMDD'}}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=latest,enable=${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/dockah-not-buildah' }}
             type=sha,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr
             type=schedule,pattern={{date 'YYYYMMDD'}}
